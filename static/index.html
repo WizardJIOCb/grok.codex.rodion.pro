@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Го Онлайн — Grok Go</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+        
+        :root {
+            --wood: #c9a26f;
+        }
+        
+        body {
+            font-family: 'Inter', system_ui, sans-serif;
+        }
+        
+        .title-font {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        .go-board {
+            background: #c9a26f;
+            background-image: 
+                linear-gradient(#8a6f4a 1px, transparent 1px),
+                linear-gradient(90deg, #8a6f4a 1px, transparent 1px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3),
+                        inset 0 0 40px rgb(255 255 255 / 0.15),
+                        inset 0 0 0 1px #8a6f4a;
+            border: 8px solid #5c4731;
+        }
+
+        .stone {
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4),
+                        inset 0 -3px 6px rgb(255 255 255 / 0.25),
+                        inset 0 3px 6px rgb(0 0 0 / 0.3);
+            transition: transform 0.1s ease;
+        }
+
+        .stone.black {
+            background: radial-gradient(circle at 35% 30%, #4a4a4a, #111);
+        }
+
+        .stone.white {
+            background: radial-gradient(circle at 35% 30%, #f8f8f8, #c8c8c8);
+        }
+
+        .portal {
+            background: radial-gradient(circle, #3b82f6 0%, #1e40af 70%, transparent 85%);
+            box-shadow: 0 0 12px #3b82f6,
+                        inset 0 0 8px #1e40af;
+            animation: portal-pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes portal-pulse {
+            0%, 100% { opacity: 0.75; }
+            50% { opacity: 1; }
+        }
+
+        .move-preview {
+            opacity: 0.6;
+            transition: opacity 0.15s ease;
+        }
+
+        .game-container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .board-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+
+        .section-header {
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .go-stone {
+            width: 28px;
+            height: 28px;
+            border-radius: 9999px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 
+                        inset 0 -2px 4px rgb(255 255 255 / 0.3),
+                        inset 0 2px 4px rgb(0 0 0 / 0.4);
+        }
+
+        .modal {
+            animation: modal-pop 0.2s ease forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <div class="border-b border-slate-800 bg-slate-900/70 backdrop-blur">
+            <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-x-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                        <span class="text-white font-bold text-3xl leading-none mt-0.5">G</span>
+                    </div>
+                    <div>
+                        <h1 class="title-font text-3xl font-semibold tracking-tighter">Grok Go</h1>
+                        <p class="text-[10px] text-slate-500 -mt-1">Классика и Порталы</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-x-3 text-sm">
+                    <div class="px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 flex items-center gap-x-2">
+                        <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                        <span class="text-emerald-400 text-xs font-medium">ОНЛАЙН</span>
+                    </div>
+                    <div onclick="showRules()" 
+                         class="cursor-pointer px-4 py-1.5 text-xs font-medium bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-full flex items-center gap-x-1.5 transition-colors">
+                        <span>Правила</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="max-w-6xl mx-auto px-6 py-8" id="app">
+            
+            <!-- LOBBY SCREEN -->
+            <div id="lobby-screen">
+                <div class="text-center mb-8">
+                    <h2 class="text-4xl font-semibold tracking-tight">Добро пожаловать в Го</h2>
+                    <p class="text-slate-400 mt-2 max-w-md mx-auto">Создайте сессию или присоединяйтесь к существующей. Играйте в классику или в новый режим <span class="font-semibold text-blue-400">Portal Go</span>.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    
+                    <!-- Create Session -->
+                    <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-7">
+                        <div class="section-header mb-4">Создать новую партию</div>
+                        
+                        <form id="create-form" onsubmit="createSession(event)">
+                            <div class="space-y-5">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1.5">ВАШЕ ИМЯ</label>
+                                    <input id="create-name" type="text" value="Игрок" required
+                                           class="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 transition-colors rounded-2xl px-4 py-3 text-sm outline-none">
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1.5">РЕЖИМ</label>
+                                        <select id="create-mode" class="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 transition-colors rounded-2xl px-4 py-3 text-sm outline-none">
+                                            <option value="classic">Классический Го</option>
+                                            <option value="portal">Portal Go ★</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1.5">РАЗМЕР ДОСКИ</label>
+                                        <select id="create-size" class="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 transition-colors rounded-2xl px-4 py-3 text-sm outline-none">
+                                            <option value="19">19 × 19 (стандарт)</option>
+                                            <option value="13">13 × 13</option>
+                                            <option value="9">9 × 9 (быстрая)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <button type="submit"
+                                        class="w-full mt-2 py-3.5 bg-white hover:bg-slate-100 active:bg-slate-200 transition-all text-slate-950 font-semibold rounded-2xl text-sm tracking-wider">
+                                    СОЗДАТЬ СЕССИЮ
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <div class="mt-4 text-[10px] text-center text-slate-500">
+                            Вы будете играть за <span class="font-semibold text-slate-300">Чёрных</span>
+                        </div>
+                    </div>
+
+                    <!-- Join / Open Sessions -->
+                    <div class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-3xl p-7 flex flex-col">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="section-header">Открытые сессии</div>
+                            <button onclick="refreshSessions()" 
+                                    class="text-xs flex items-center gap-x-1 px-3 py-1 rounded-full border border-slate-700 hover:bg-slate-800 transition-colors">
+                                <span>Обновить</span>
+                            </button>
+                        </div>
+
+                        <div id="sessions-list" class="flex-1 overflow-auto space-y-2 text-sm min-h-[180px]">
+                            <!-- Populated by JS -->
+                            <div class="text-slate-500 text-center py-8">Загрузка...</div>
+                        </div>
+                    </div>
+                    
+                </div>
+
+                <div class="mt-6 text-center">
+                    <div class="inline-flex items-center gap-x-2 text-xs text-slate-500">
+                        <div class="h-px w-8 bg-slate-800"></div>
+                        <span>Игра работает полностью в браузере • WebSocket в реальном времени</span>
+                        <div class="h-px w-8 bg-slate-800"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GAME SCREEN -->
+            <div id="game-screen" class="hidden">
+                <div class="flex flex-col lg:flex-row gap-8 game-container">
+                    
+                    <!-- Board -->
+                    <div class="flex-1 flex flex-col items-center">
+                        <div class="flex items-center justify-between w-full max-w-[620px] mb-3 px-1">
+                            <div>
+                                <div id="game-mode-badge" 
+                                     class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold tracking-wider bg-slate-800 border border-slate-700"></div>
+                            </div>
+                            <div class="text-xs text-slate-400 font-mono" id="session-code-display"></div>
+                        </div>
+
+                        <div class="board-container">
+                            <canvas id="go-board" width="620" height="620" 
+                                    class="rounded-3xl cursor-pointer shadow-2xl go-board"></canvas>
+                        </div>
+
+                        <div class="flex gap-2 mt-4 text-xs">
+                            <button onclick="passTurn()" 
+                                    class="px-5 py-2 rounded-2xl border border-slate-700 hover:bg-slate-900 transition-colors text-sm font-medium">
+                                Пасс
+                            </button>
+                            <button onclick="resignGame()" 
+                                    class="px-5 py-2 rounded-2xl border border-red-900/70 hover:bg-red-950 text-red-400 transition-colors text-sm font-medium">
+                                Сдаться
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sidebar -->
+                    <div class="w-full lg:w-80 flex-shrink-0 space-y-4">
+                        
+                        <!-- Players -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5">
+                            <div class="section-header mb-3">Игроки</div>
+                            
+                            <div class="space-y-3">
+                                <!-- Black -->
+                                <div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-2xl p-3">
+                                    <div class="flex items-center gap-x-3">
+                                        <div class="go-stone black"></div>
+                                        <div>
+                                            <div class="text-xs text-slate-400">Чёрные</div>
+                                            <div id="player-black" class="font-semibold">—</div>
+                                        </div>
+                                    </div>
+                                    <div id="status-black" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800"></div>
+                                </div>
+
+                                <!-- White -->
+                                <div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-2xl p-3">
+                                    <div class="flex items-center gap-x-3">
+                                        <div class="go-stone white"></div>
+                                        <div>
+                                            <div class="text-xs text-slate-400">Белые</div>
+                                            <div id="player-white" class="font-semibold">—</div>
+                                        </div>
+                                    </div>
+                                    <div id="status-white" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Game Status -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5">
+                            <div class="section-header mb-3">Состояние партии</div>
+                            
+                            <div id="turn-indicator" 
+                                 class="text-center py-3 rounded-2xl bg-slate-950 border border-slate-700 text-sm font-medium mb-4">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 text-center">
+                                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3">
+                                    <div class="text-[10px] text-slate-400">Захвачено</div>
+                                    <div class="flex items-baseline justify-center gap-x-1 mt-0.5">
+                                        <div id="captured-black" class="font-mono text-xl font-semibold">0</div>
+                                        <div class="text-xs text-slate-500">ч</div>
+                                    </div>
+                                </div>
+                                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3">
+                                    <div class="text-[10px] text-slate-400">Захвачено</div>
+                                    <div class="flex items-baseline justify-center gap-x-1 mt-0.5">
+                                        <div id="captured-white" class="font-mono text-xl font-semibold">0</div>
+                                        <div class="text-xs text-slate-500">б</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div onclick="leaveGame()" 
+                             class="cursor-pointer text-center text-xs text-slate-400 hover:text-slate-300 py-2">
+                            ← Покинуть партию
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="rules-modal" onclick="hideRules()" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6">
+        <div onclick="event.stopImmediatePropagation()" class="modal bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full p-7">
+            <div class="flex justify-between items-center mb-4">
+                <div class="font-semibold text-xl">Правила игры</div>
+                <button onclick="hideRules()" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <div class="space-y-6 text-sm leading-relaxed">
+                <div>
+                    <div class="font-semibold text-blue-400 mb-1">КЛАССИЧЕСКИЙ ГО</div>
+                    <ul class="list-disc pl-5 space-y-1 text-slate-300">
+                        <li>Стандартные правила Го (19×19, 13×13 или 9×9)</li>
+                        <li>Чёрные ходят первыми. Захват по окружению.</li>
+                        <li>Правило Ко: нельзя сразу брать одиночный камень.</li>
+                        <li>Два паса подряд — конец партии.</li>
+                        <li>Подсчёт по китайским правилам (площадь + камни + коми 7.5).</li>
+                    </ul>
+                </div>
+
+                <div class="pt-2 border-t border-slate-700">
+                    <div class="font-semibold text-violet-400 mb-1 flex items-center gap-x-2">
+                        PORTAL GO <span class="text-[10px] px-1.5 py-px rounded bg-violet-900 text-violet-200">ОРИГИНАЛЬНЫЙ РЕЖИМ</span>
+                    </div>
+                    <p class="text-slate-300 mb-2">Классические правила + механика порталов:</p>
+                    <ul class="list-disc pl-5 space-y-1 text-slate-300">
+                        <li>На доске есть 4 фиксированных <strong>Портала</strong> (нельзя ставить на них).</li>
+                        <li>Камни, стоящие рядом с одним порталом, считаются <strong>соединёнными</strong> между собой.</li>
+                        <li>Группы могут «дышать» и захватывать через порталы — даже если физически далеко.</li>
+                        <li>Появляются новые тактики: дальние глаза, портальные сэмэаи, контроль ключевых точек.</li>
+                        <li>Это полностью новый способ играть в Го.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="text-right mt-6">
+                <button onclick="hideRules()" 
+                        class="px-5 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-2xl">Понятно</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tailwind script
+        function initTailwind() {
+            document.documentElement.style.setProperty('--accent', '#3b82f6');
+        }
+
+        // Global state
+        let ws = null;
+        let currentSession = null;
+        let myColor = null;
+        let boardSize = 19;
+        let currentBoard = null;
+        let portals = [];
+        let lastMove = null;
+        let gameOver = false;
+
+        const canvas = document.getElementById('go-board');
+        const ctx = canvas.getContext('2d', { alpha: true });
+
+        let hoverPos = null;
+
+        // === UI Navigation ===
+        function showLobby() {
+            document.getElementById('lobby-screen').classList.remove('hidden');
+            document.getElementById('game-screen').classList.add('hidden');
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            currentSession = null;
+            refreshSessions();
+        }
+
+        function showGame() {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+        }
+
+        // === Session Management ===
+        async function createSession(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('create-name').value.trim() || 'Игрок';
+            const mode = document.getElementById('create-mode').value;
+            const size = parseInt(document.getElementById('create-size').value);
+
+            try {
+                const res = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        player_name: name,
+                        mode: mode,
+                        board_size: size,
+                        komi: 7.5
+                    })
+                });
+
+                if (!res.ok) throw new Error(await res.text());
+                
+                const data = await res.json();
+                myColor = data.your_color;
+                currentSession = data.code;
+                boardSize = data.board_size;
+
+                await connectWebSocket(data.code, myColor);
+                showGame();
+                
+            } catch (err) {
+                alert('Не удалось создать сессию: ' + err.message);
+            }
+        }
+
+        async function joinSession(code) {
+            const name = prompt('Введите ваше имя:', 'Игрок 2') || 'Игрок 2';
+            
+            try {
+                const res = await fetch('/api/sessions/join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_code: code, player_name: name })
+                });
+
+                if (!res.ok) throw new Error(await res.text());
+                
+                const data = await res.json();
+                myColor = data.your_color;
+                currentSession = data.code;
+                boardSize = data.board_size;
+
+                await connectWebSocket(data.code, myColor);
+                showGame();
+                
+            } catch (err) {
+                alert('Не удалось присоединиться: ' + err.message);
+            }
+        }
+
+        async function refreshSessions() {
+            const container = document.getElementById('sessions-list');
+            container.innerHTML = `<div class="text-slate-500 text-center py-6">Загрузка...</div>`;
+
+            try {
+                const res = await fetch('/api/sessions');
+                const data = await res.json();
+
+                if (!data.sessions || data.sessions.length === 0) {
+                    container.innerHTML = `<div class="text-center py-8 text-sm text-slate-500">Пока нет открытых сессий.<br>Создайте свою!</div>`;
+                    return;
+                }
+
+                container.innerHTML = '';
+                data.sessions.forEach(sess => {
+                    const div = document.createElement('div');
+                    div.className = `flex items-center justify-between px-4 py-3 bg-slate-950 hover:bg-slate-900 border border-slate-800 rounded-2xl cursor-pointer transition-colors`;
+                    div.innerHTML = `
+                        <div class="flex items-center gap-x-3">
+                            <div>
+                                <div class="font-semibold text-sm">${sess.code}</div>
+                                <div class="text-xs text-slate-500">${sess.board_size}×${sess.board_size} • ${sess.mode === 'portal' ? 'Portal Go' : 'Классика'}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs">${sess.players['1'] || '—'} <span class="text-slate-500">vs</span> ${sess.players['2'] || 'ожидает'}</div>
+                            <button onclick="event.stopImmediatePropagation(); joinSession('${sess.code}')" 
+                                    class="mt-1 text-xs bg-blue-600 hover:bg-blue-500 px-3 py-0.5 rounded-full text-white">Присоединиться</button>
+                        </div>
+                    `;
+                    div.onclick = () => joinSession(sess.code);
+                    container.appendChild(div);
+                });
+            } catch (e) {
+                container.innerHTML = `<div class="text-red-400 text-xs text-center py-4">Ошибка загрузки</div>`;
+            }
+        }
+
+        // === WebSocket ===
+        async function connectWebSocket(code, color) {
+            if (ws) ws.close();
+
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const url = `${protocol}//${location.host}/ws/${code}?color=${color}`;
+
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleWSMessage(msg);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket closed');
+                if (!gameOver) {
+                    // Auto-reconnect attempt could be added here
+                }
+            };
+
+            ws.onerror = (err) => {
+                console.error('WS error', err);
+            };
+        }
+
+        function handleWSMessage(msg) {
+            if (msg.type === 'welcome' || msg.type === 'state' || msg.type === 'move' || msg.type === 'pass') {
+                const state = msg.data;
+                updateGameUI(state);
+            }
+            
+            if (msg.type === 'game_over') {
+                const state = msg.data;
+                updateGameUI(state);
+                showGameOverModal(state);
+            }
+            
+            if (msg.type === 'error') {
+                alert(msg.error || 'Ошибка');
+            }
+        }
+
+        function updateGameUI(state) {
+            currentBoard = state.board;
+            boardSize = state.board_size;
+            portals = state.portals || [];
+            lastMove = state.last_move;
+            gameOver = state.game_over;
+
+            // Update player names
+            document.getElementById('player-black').textContent = state.players['1'] || '—';
+            document.getElementById('player-white').textContent = state.players['2'] || 'Ожидает...';
+
+            // Turn indicator
+            const turnEl = document.getElementById('turn-indicator');
+            if (gameOver) {
+                turnEl.innerHTML = `<span class="text-emerald-400 font-semibold">ИГРА ЗАВЕРШЕНА</span>`;
+            } else if (state.current_player === myColor) {
+                turnEl.innerHTML = `<span class="text-emerald-400">ВАШ ХОД</span>`;
+            } else {
+                turnEl.innerHTML = `Ход ${state.current_player === 1 ? 'чёрных' : 'белых'}`;
+            }
+
+            // Captured
+            document.getElementById('captured-black').textContent = state.captured['1'] || 0;
+            document.getElementById('captured-white').textContent = state.captured['2'] || 0;
+
+            // Mode badge
+            const modeBadge = document.getElementById('game-mode-badge');
+            modeBadge.innerHTML = state.mode === 'portal' 
+                ? `<span class="text-violet-400">PORTAL GO</span>` 
+                : `КЛАССИЧЕСКИЙ ГО`;
+            modeBadge.className = `inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold tracking-wider border ${state.mode === 'portal' ? 'bg-violet-900/30 border-violet-700 text-violet-300' : 'bg-slate-800 border-slate-700'}`;
+
+            document.getElementById('session-code-display').textContent = state.code;
+
+            // Status dots
+            document.getElementById('status-black').innerHTML = state.players['1'] ? '●' : '';
+            document.getElementById('status-white').innerHTML = state.players['2'] ? '●' : '';
+
+            // Score if game over
+            if (state.score && state.game_over) {
+                // Handled in modal
+            }
+
+            drawBoard();
+        }
+
+        // === Canvas Board Drawing ===
+        function drawBoard() {
+            if (!currentBoard || !canvas) return;
+
+            const size = boardSize;
+            const padding = 32;
+            const cell = (canvas.width - padding * 2) / (size - 1);
+
+            ctx.save();
+            ctx.fillStyle = '#c9a26f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Grid lines
+            ctx.strokeStyle = '#8a6f4a';
+            ctx.lineWidth = 1.2;
+
+            for (let i = 0; i < size; i++) {
+                // horizontal
+                ctx.beginPath();
+                ctx.moveTo(padding, padding + i * cell);
+                ctx.lineTo(canvas.width - padding, padding + i * cell);
+                ctx.stroke();
+
+                // vertical
+                ctx.beginPath();
+                ctx.moveTo(padding + i * cell, padding);
+                ctx.lineTo(padding + i * cell, canvas.height - padding);
+                ctx.stroke();
+            }
+
+            // Star points (hoshi)
+            const hoshi = getHoshiPositions(size);
+            ctx.fillStyle = '#5c4731';
+            hoshi.forEach(([x, y]) => {
+                const px = padding + x * cell;
+                const py = padding + y * cell;
+                ctx.beginPath();
+                ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Portals (in Portal mode)
+            ctx.fillStyle = '#3b82f6';
+            portals.forEach(([r, c]) => {
+                const px = padding + c * cell;
+                const py = padding + r * cell;
+                
+                ctx.save();
+                ctx.shadowColor = '#3b82f6';
+                ctx.shadowBlur = 14;
+                ctx.beginPath();
+                ctx.arc(px, py, cell * 0.22, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // inner glow
+                ctx.fillStyle = '#1e40af';
+                ctx.beginPath();
+                ctx.arc(px, py, cell * 0.13, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#3b82f6';
+            });
+
+            // Stones
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    const val = currentBoard[r][c];
+                    if (val === 0) continue;
+
+                    const px = padding + c * cell;
+                    const py = padding + r * cell;
+                    const radius = cell * 0.42;
+
+                    ctx.save();
+                    
+                    if (val === 1) { // Black
+                        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+                        ctx.shadowBlur = 6;
+                        ctx.shadowOffsetY = 2;
+                        ctx.fillStyle = '#111';
+                        ctx.beginPath();
+                        ctx.arc(px, py, radius, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.shadowBlur = 0;
+                        ctx.fillStyle = '#333';
+                        ctx.beginPath();
+                        ctx.arc(px - radius * 0.25, py - radius * 0.25, radius * 0.45, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else { // White
+                        ctx.shadowColor = 'rgba(0,0,0,0.25)';
+                        ctx.shadowBlur = 4;
+                        ctx.shadowOffsetY = 1;
+                        ctx.fillStyle = '#f1f1f1';
+                        ctx.beginPath();
+                        ctx.arc(px, py, radius, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.shadowBlur = 0;
+                        ctx.fillStyle = '#c8c8c8';
+                        ctx.beginPath();
+                        ctx.arc(px - radius * 0.2, py - radius * 0.2, radius * 0.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        // highlight
+                        ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.arc(px - radius * 0.18, py - radius * 0.18, radius * 0.38, 0, Math.PI * 1.6);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+            }
+
+            // Last move marker
+            if (lastMove) {
+                const [r, c] = lastMove;
+                const px = padding + c * cell;
+                const py = padding + r * cell;
+                
+                ctx.strokeStyle = '#f43f5e';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(px, py, cell * 0.26, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Hover preview
+            if (hoverPos && !gameOver) {
+                const [r, c] = hoverPos;
+                if (currentBoard[r][c] === 0) {
+                    const px = padding + c * cell;
+                    const py = padding + r * cell;
+                    const radius = cell * 0.42;
+                    
+                    ctx.save();
+                    ctx.globalAlpha = 0.45;
+                    if (myColor === 1) {
+                        ctx.fillStyle = '#111';
+                    } else {
+                        ctx.fillStyle = '#f1f1f1';
+                    }
+                    ctx.beginPath();
+                    ctx.arc(px, py, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function getHoshiPositions(size) {
+            if (size === 19) return [[3,3],[3,9],[3,15],[9,3],[9,9],[9,15],[15,3],[15,9],[15,15]];
+            if (size === 13) return [[3,3],[3,9],[9,3],[9,9],[6,6]];
+            if (size === 9) return [[2,2],[2,6],[6,2],[6,6],[4,4]];
+            return [];
+        }
+
+        // === Board Interaction ===
+        function setupBoardInteractions() {
+            canvas.addEventListener('mousemove', (e) => {
+                const pos = getBoardPosFromEvent(e);
+                if (pos) {
+                    hoverPos = pos;
+                    drawBoard();
+                }
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                hoverPos = null;
+                drawBoard();
+            });
+
+            canvas.addEventListener('click', (e) => {
+                const pos = getBoardPosFromEvent(e);
+                if (!pos || gameOver || !ws || !currentSession) return;
+
+                const [row, col] = pos;
+
+                // Send move
+                ws.send(JSON.stringify({
+                    type: 'move',
+                    row: row,
+                    col: col
+                }));
+                
+                hoverPos = null;
+            });
+
+            // Touch support
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const pos = getBoardPosFromEvent(e.touches[0]);
+                if (pos && !gameOver && ws) {
+                    ws.send(JSON.stringify({ type: 'move', row: pos[0], col: pos[1] }));
+                }
+            }, { passive: false });
+        }
+
+        function getBoardPosFromEvent(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const padding = 32;
+            const cell = (canvas.width - padding * 2) / (boardSize - 1);
+
+            let col = Math.round((x - padding) / cell);
+            let row = Math.round((y - padding) / cell);
+
+            col = Math.max(0, Math.min(boardSize - 1, col));
+            row = Math.max(0, Math.min(boardSize - 1, row));
+
+            return [row, col];
+        }
+
+        // === Game Actions ===
+        function passTurn() {
+            if (!ws || gameOver) return;
+            ws.send(JSON.stringify({ type: 'pass' }));
+        }
+
+        function resignGame() {
+            if (!ws || gameOver) return;
+            if (!confirm('Вы уверены, что хотите сдаться?')) return;
+            ws.send(JSON.stringify({ type: 'resign' }));
+        }
+
+        function leaveGame() {
+            if (ws) ws.close();
+            showLobby();
+        }
+
+        function showGameOverModal(state) {
+            const score = state.score || {};
+            let html = `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]" onclick="this.remove()">`;
+            html += `<div onclick="event.stopImmediatePropagation()" class="bg-slate-900 border border-slate-700 rounded-3xl p-8 max-w-md w-full modal">`;
+            
+            html += `<div class="text-center">`;
+            html += `<div class="text-2xl font-semibold mb-1">Игра завершена</div>`;
+            
+            if (score.by_resign) {
+                html += `<div class="text-emerald-400 mt-3">Победа ${score.winner === 1 ? 'чёрных' : 'белых'} (сдача)</div>`;
+            } else if (score.winner) {
+                const winnerName = score.winner === 1 ? state.players['1'] : state.players['2'];
+                html += `<div class="mt-4">`;
+                html += `<div class="text-xl font-semibold">${score.winner === 1 ? 'Чёрные' : 'Белые'} побеждают</div>`;
+                html += `<div class="text-sm text-slate-400 mt-1">${winnerName}</div>`;
+                html += `<div class="mt-4 text-4xl tabular-nums font-semibold font-mono">${score.black} : ${score.white}</div>`;
+                html += `</div>`;
+            } else {
+                html += `<div class="text-slate-400 mt-3">Ничья</div>`;
+            }
+
+            html += `</div>`;
+            html += `<div class="mt-6 flex justify-center">`;
+            html += `<button onclick="this.closest('.fixed').remove(); showLobby();" class="px-6 py-2 bg-white text-slate-950 rounded-2xl font-medium text-sm">Вернуться в лобби</button>`;
+            html += `</div></div></div>`;
+
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        // === Rules Modal ===
+        function showRules() {
+            document.getElementById('rules-modal').classList.remove('hidden');
+            document.getElementById('rules-modal').classList.add('flex');
+        }
+        function hideRules() {
+            const m = document.getElementById('rules-modal');
+            m.classList.remove('flex');
+            m.classList.add('hidden');
+        }
+
+        // === Init ===
+        function init() {
+            initTailwind();
+            setupBoardInteractions();
+
+            // Initial board preview (empty)
+            currentBoard = Array.from({length: 19}, () => Array(19).fill(0));
+            boardSize = 19;
+            portals = [[3,3],[3,15],[15,3],[15,15]];
+            drawBoard();
+
+            // Start with lobby
+            showLobby();
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.key.toLowerCase() === 'p' && document.getElementById('game-screen').classList.contains('hidden') === false) {
+                    passTurn();
+                }
+            });
+
+            // Auto refresh sessions occasionally
+            setInterval(() => {
+                if (!document.getElementById('lobby-screen').classList.contains('hidden')) {
+                    refreshSessions();
+                }
+            }, 15000);
+        }
+
+        // Boot
+        window.onload = init;
+    </script>
+</body>
+</html>
