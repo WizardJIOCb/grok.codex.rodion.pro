@@ -1,0 +1,15 @@
+[Unit]
+Description=Grok Go FastAPI app
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/grok.codex.rodion.pro
+Environment=PATH=/var/www/grok.codex.rodion.pro/.venv/bin
+ExecStart=/var/www/grok.codex.rodion.pro/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
